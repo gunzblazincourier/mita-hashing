@@ -2,7 +2,9 @@
 
 using namespace std;
 
-const int TABLE_SIZE = 10007; 
+enum Algorithms {L, Q};
+enum Algorithms alg = L;
+const int TABLE_SIZE = 10007;
 
 struct Pair {
     int key;
@@ -12,6 +14,14 @@ struct Pair {
 Pair* table[TABLE_SIZE]; 
 
 long long collision_count = 0;
+
+void flip_enum() {
+    if (alg == L) {
+        alg = Q;
+    } else if (alg == Q) {
+        alg = L;
+    }
+}
 
 int hash_func(int key) {
     return key % TABLE_SIZE;
@@ -37,7 +47,7 @@ bool insert(Pair* p) {
     int original_index = index;
     int attempts = 0;
 
-    // Modified to use Linear Probing instead of just returning false
+    // Modified to use Linear or Quadratic probing instead of just returning false
     while (table[index] != nullptr) {
         if (table[index]->key == p->key) {  //assume no duplicate keys allowed. 
             table[index]->value = p->value;
@@ -45,10 +55,15 @@ bool insert(Pair* p) {
         }
 
         collision_count++; // Track this metric
-        
-        // Lin probe: go to next index
-        index = (index + 1) % TABLE_SIZE;
         attempts++;
+
+        // Lin probe: go to next index
+        if (alg == L) {
+            index = (index + 1) % TABLE_SIZE;
+        // Quadratic probe: change index to index + attempts^2
+        } else if (alg == Q) {
+            index = (index + pow(attempts, 2)) % TABLE_SIZE;
+        }
 
         if (attempts >= TABLE_SIZE) {
             return false;   //avoid infinite loop if table is full
@@ -68,10 +83,15 @@ Pair* search(int key) {
             return table[index];
         }
         
-        // Lin probe to find it
-        index = (index + 1) % TABLE_SIZE;
-        attempts++;
         collision_count++;
+        attempts++;
+
+        // Lin or quad probe to find it
+        if (alg == L) {
+            index = (index + 1) % TABLE_SIZE;   
+        } else if (alg == Q) {
+            index = (index + pow(attempts, 2)) % TABLE_SIZE;
+        }
         
         if (attempts >= TABLE_SIZE) break;
     }
