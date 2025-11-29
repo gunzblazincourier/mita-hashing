@@ -4,18 +4,18 @@ using namespace std;
 
 enum Algorithms {L, Q, D};
 enum Algorithms alg = L;
-const int TABLE_SIZE = 10007;
 
+const int TABLE_SIZE = 10007;
 struct Pair {
     int key;
     int value;
 };
 
-Pair* table[TABLE_SIZE]; 
+Pair* table[TABLE_SIZE];
+vector<Pair*> table2[TABLE_SIZE];
 
 long long collision_count = 0;
-
-void flip_enum(Algorithms a) {
+void flip_enum_alg(Algorithms a) {
     alg = a;
 }
 
@@ -62,9 +62,9 @@ bool insert(Pair* p) {
             index = (index + 1) % TABLE_SIZE;
         // Quadratic probe: change index to index + attempts^2
         } else if (alg == Q) {
-            index = (index + pow(attempts, 2)) % TABLE_SIZE;
+            index = ((int)(index + pow(attempts, 2))) % TABLE_SIZE;
         } else if (alg == D) {
-            index = (index + (attempts * hash_func2(p->key))) % TABLE_SIZE;
+            index = ((int)(index + (attempts * hash_func2(p->key)))) % TABLE_SIZE;
         }
 
         if (attempts >= TABLE_SIZE) {
@@ -92,12 +92,50 @@ Pair* search(int key) {
         if (alg == L) {
             index = (index + 1) % TABLE_SIZE;   
         } else if (alg == Q) {
-            index = (index + pow(attempts, 2)) % TABLE_SIZE;
+            index = ((int)(index + pow(attempts, 2))) % TABLE_SIZE;
         } else if (alg == D) {
-            index = (index + (attempts * hash_func2(p->key))) % TABLE_SIZE;
+            index = ((int)(index + (attempts * hash_func2(key)))) % TABLE_SIZE;
         }
         
         if (attempts >= TABLE_SIZE) break;
+    }
+    return nullptr;
+}
+
+bool insert2(Pair* p) {
+    if (p == nullptr) {
+        return false;
+    }
+    int index = hash_func(p->key);
+
+    // NOTE: Assumption that all indices will contain vectors (temporary)
+    // // Insert vector in index if none
+    // if (table2[index] == nullptr) {
+    //     vector<Pair*> v;
+    //     table2[index] = v;
+    // }
+
+    // Replace value in case of duplicate key
+    for (int i = 0; i < table2[index].size(); i++) {
+        if (table2[index][i]->key == p->key) {
+            table2[index][i]->value = p->value;
+            return true;
+        }
+    }
+
+    // Else add Pair to vector at index position
+    table2[index].push_back(p);
+    return true;
+}
+
+Pair* search2(int key) {
+    int index = hash_func(key);
+
+    // For-each loop through vector at index; found if key matches
+    for (Pair* p : table2[index]) {
+        if (p->key == key) {
+            return p;
+        }
     }
     return nullptr;
 }
