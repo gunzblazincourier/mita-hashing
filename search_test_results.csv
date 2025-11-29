@@ -1,0 +1,9 @@
+Strategy,Load_Factor,Time_ns,Collisions
+Linear_Success,0.7,45064,0
+Linear_Fail,0.7,33273748,8006001
+Quadratic_Success,0.7,47242,0
+Quadratic_Fail,0.7,652796,71725
+Double_Success,0.7,70221,0
+Double_Fail,0.7,218507,23038
+Chaining_Success,0.7,78850,0
+Chaining_Fail,0.7,70767,4001

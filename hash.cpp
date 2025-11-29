@@ -2,7 +2,7 @@
 
 using namespace std;
 
-enum Algorithms {L, Q, D};
+enum Algorithms {L, Q, D, C}; // Added 'C' for chaining
 enum Algorithms alg = L;
 
 const int TABLE_SIZE = 10007;
@@ -29,12 +29,21 @@ int hash_func2(int key) {
 
 // Helper to clear table between tests
 void clear_table() {
+    // 1. Clear Open Addressing Table
     for (int i = 0; i < TABLE_SIZE; i++) {
         if (table[i] != nullptr) {
-            delete table[i]; // Clean up mem
+            delete table[i]; 
             table[i] = nullptr;
         }
     }
+    // 2. Clear Chaining Table
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        for (Pair* p : table2[i]) {
+            delete p; 
+        }
+        table2[i].clear(); 
+    }
+
     collision_count = 0;
 }
 
@@ -131,11 +140,11 @@ bool insert2(Pair* p) {
 Pair* search2(int key) {
     int index = hash_func(key);
 
-    // For-each loop through vector at index; found if key matches
     for (Pair* p : table2[index]) {
         if (p->key == key) {
             return p;
         }
+        collision_count++;
     }
     return nullptr;
 }
@@ -152,54 +161,129 @@ vector<int> generate_data(int count) {
 }
 
 // CSV Writing
-void save_to_csv(string filename, double load_factor, long long time_ns, long long collisions) {
+void save_to_csv(string filename, string strategy_name, double load_factor, long long time_ns, long long collisions) {
     ofstream file;
     file.open(filename, ios::app);
     
     file.seekp(0, ios::end);
     if (file.tellp() == 0) {
-        file << "Load_Factor,Time_ns,Collisions\n";
+        file << "Strategy,Load_Factor,Time_ns,Collisions\n";
     }
     
-    file << load_factor << "," << time_ns << "," << collisions << "\n";
+    file << strategy_name << "," << load_factor << "," << time_ns << "," << collisions << "\n";
     file.close();
 }
 
 // Test Logic (LOAD FACTOR STRESS TEST)
 void run_load_factor_test() {
-    cout << "Starting Load Factor Stress Test..." << endl;
-    
-    // Test from 5% to 95% full
-    for (double load = 0.05; load <= 0.95; load += 0.05) {
-        clear_table();
-        
-        int num_items = (int)(TABLE_SIZE * load);
-        vector<int> keys = generate_data(num_items);
+    // We will loop through 0,1,2,3 (L, Q, D, C)
+    vector<string> names = {"Linear", "Quadratic", "Double", "Chaining"};
+    vector<Algorithms> algs = {L, Q, D, C};
 
-        // 1. Fill table
-        for(int k : keys) {
+    for(int s = 0; s < 4; s++) {
+        // Set the global strat
+        alg = algs[s];
+        string current_name = names[s];
+        
+        cout << "\n=== Testing Strategy: " << current_name << " ===" << endl;
+
+        // Test from 5% to 95% full
+        for (double load = 0.05; load <= 0.95; load += 0.05) {
+            clear_table();
+            
+            int num_items = (int)(TABLE_SIZE * load);
+            vector<int> keys = generate_data(num_items);
+
+            // 1. Fill table
+            for(int k : keys) {
+                Pair* p = new Pair;
+                p->key = k;
+                p->value = k;
+                
+                // Switch Logic for Insert
+                if (alg == C) insert2(p);
+                else insert(p);
+            }
+
+            // 2. Measure Search Time
+            collision_count = 0; 
+            
+            auto start = chrono::high_resolution_clock::now();
+            
+            for(int k : keys) {
+                // Switch Logic for Search
+                if (alg == C) search2(k);
+                else search(k);
+            }
+
+            auto end = chrono::high_resolution_clock::now();
+            auto duration = chrono::duration_cast<chrono::nanoseconds>(end - start).count();
+
+            // 3. Save Results
+            cout << "Load: " << load << " | Time: " << duration << "ns | Collisions: " << collision_count << endl;
+            save_to_csv("hash_results.csv", current_name, load, duration, collision_count);
+        }
+    }
+}
+
+void run_search_test() {
+    cout << "\n=== Starting Successful vs Unsuccessful Search Test ===" << endl;
+
+    vector<string> names = {"Linear", "Quadratic", "Double", "Chaining"};
+    vector<Algorithms> algs = {L, Q, D, C};
+    
+    // Fix load fact. at 70% for this experiment?
+    double load = 0.70;
+    int num_items = (int)(TABLE_SIZE * load);
+
+    for(int s = 0; s < 4; s++) {
+        alg = algs[s];
+        clear_table();
+
+        // 1. Gen the Data
+        vector<int> present_keys; // Keys IN table
+        vector<int> absent_keys;  // Keys NOT be in table
+
+        // Gen even numbers for "Present" keys and odd for "Absent" keys to ensure no overlap
+        for(int i=0; i<num_items; i++) {
+            present_keys.push_back(i * 2);      // 0, 2, 4...
+            absent_keys.push_back((i * 2) + 1); // 1, 3, 5...
+        }
+
+        // 2. Fill Table
+        for(int k : present_keys) {
             Pair* p = new Pair;
             p->key = k;
-            p->value = k; // using key = value for now? Can make this 0...
-            insert(p);
+            p->value = k;
+            if (alg == C) insert2(p);
+            else insert(p);
         }
 
-        // 2. Measure Search Time
-        collision_count = 0; // Reset to count collisions during search
-        
-        auto start = chrono::high_resolution_clock::now(); //start clock
-        
-        // Search for every key we inserted (Successful search test)
-        for(int k : keys) {
-            search(k);
+        // 3. Test Successful Search
+        collision_count = 0;
+        auto start_succ = chrono::high_resolution_clock::now();
+        for(int k : present_keys) {
+            if (alg == C) search2(k);
+            else search(k);
         }
+        auto end_succ = chrono::high_resolution_clock::now();
+        long long time_succ = chrono::duration_cast<chrono::nanoseconds>(end_succ - start_succ).count();
+        
+        save_to_csv("search_test_results.csv", names[s] + "_Success", load, time_succ, collision_count);
+        cout << names[s] << " Success | Time: " << time_succ << " | Collisions: " << collision_count << endl;
 
-        auto end = chrono::high_resolution_clock::now(); //end clock
-        auto duration = chrono::duration_cast<chrono::nanoseconds>(end - start).count();
+        // 4. Test Unsuccessful Search
+        collision_count = 0;
+        auto start_fail = chrono::high_resolution_clock::now();
+        for(int k : absent_keys) {
+            if (alg == C) search2(k);
+            else search(k);
+        }
+        auto end_fail = chrono::high_resolution_clock::now();
+        long long time_fail = chrono::duration_cast<chrono::nanoseconds>(end_fail - start_fail).count();
 
-        // 3. Save Results
-        cout << "Load: " << load << " | Time: " << duration << "ns | Collisions: " << collision_count << endl;
-        save_to_csv("results_linear.csv", load, duration, collision_count);
+        save_to_csv("search_test_results.csv", names[s] + "_Fail", load, time_fail, collision_count);
+        cout << names[s] << " Fail    | Time: " << time_fail << " | Collisions: " << collision_count << endl;
     }
 }
 
@@ -210,6 +294,7 @@ int main() {
     for(int i=0; i<TABLE_SIZE; i++) table[i] = nullptr;
 
     run_load_factor_test();
+    run_search_test();
 
     return 0;
 }
