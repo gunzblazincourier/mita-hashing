@@ -2,7 +2,7 @@
 
 using namespace std;
 
-enum Algorithms {L, Q};
+enum Algorithms {L, Q, D};
 enum Algorithms alg = L;
 const int TABLE_SIZE = 10007;
 
@@ -15,16 +15,16 @@ Pair* table[TABLE_SIZE];
 
 long long collision_count = 0;
 
-void flip_enum() {
-    if (alg == L) {
-        alg = Q;
-    } else if (alg == Q) {
-        alg = L;
-    }
+void flip_enum(Algorithms a) {
+    alg = a;
 }
 
 int hash_func(int key) {
     return key % TABLE_SIZE;
+}
+
+int hash_func2(int key) {
+    return 983 - (key % 983);
 }
 
 // Helper to clear table between tests
@@ -63,6 +63,8 @@ bool insert(Pair* p) {
         // Quadratic probe: change index to index + attempts^2
         } else if (alg == Q) {
             index = (index + pow(attempts, 2)) % TABLE_SIZE;
+        } else if (alg == D) {
+            index = (index + (attempts * hash_func2(p->key))) % TABLE_SIZE;
         }
 
         if (attempts >= TABLE_SIZE) {
@@ -91,6 +93,8 @@ Pair* search(int key) {
             index = (index + 1) % TABLE_SIZE;   
         } else if (alg == Q) {
             index = (index + pow(attempts, 2)) % TABLE_SIZE;
+        } else if (alg == D) {
+            index = (index + (attempts * hash_func2(p->key))) % TABLE_SIZE;
         }
         
         if (attempts >= TABLE_SIZE) break;
